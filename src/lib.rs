@@ -112,6 +112,20 @@ impl BitFlags {
 
 const DEVICE_ADDRESS: u8 = 0x10;
 
+/// Integration durations for the UV measurement.
+pub enum IntegrationTime {
+    /// 50ms
+    It50  = 0b000,
+    /// 100ms
+    It100 = 0b001,
+    /// 200ms
+    It200 = 0b010,
+    /// 400ms
+    It400 = 0b011,
+    /// 800ms
+    It800 = 0b100,
+}
+
 /// Veml6075 device driver.
 #[derive(Debug, Default)]
 pub struct Veml6075<I2C> {
@@ -148,6 +162,12 @@ where
     pub fn disable(&mut self) -> Result<(), Error<E>> {
         let config = self.config;
         self.write_config(config | BitFlags::SHUTDOWN)
+    }
+
+    /// Set the integration time for measurements.
+    pub fn set_integration_time(&mut self, it: IntegrationTime) -> Result<(), Error<E>> {
+        let config = self.config;
+        self.write_config(config | ((it as u8) << 4))
     }
 
     fn write_config(&mut self, config: u8) -> Result<(), Error<E>> {
