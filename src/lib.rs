@@ -252,13 +252,13 @@ where
 /// Coefficients chosen from Designing the VEML6075 Into an Application
 /// table UV COEFFICIENTS AND RESPONSIVITY for Open Air.
 pub fn calculate_uv_index(uva: u16, uvb: u16, uvcomp1: u16, uvcomp2: u16) -> f32 {
-    let uva: f32 = {
+    let uva_i: f32 = {
         let a: f32 = 2.22;
         let b: f32 = 1.33;
 
         (uva as f32) - (a * (uvcomp1 as f32)) - (b * (uvcomp2 as f32))
     };
-    let uvb: f32 = {
+    let uvb_i: f32 = {
         let c: f32 = 2.95;
         let d: f32 = 1.74;
 
@@ -269,7 +269,7 @@ pub fn calculate_uv_index(uva: u16, uvb: u16, uvcomp1: u16, uvcomp2: u16) -> f32
         let uvaresp: f32 = 0.001461;
         let uvbresp: f32 = 0.002591;
 
-        ((uva * uvaresp) + (uvb * uvbresp)) / 2.0
+        ((uva_i * uvaresp) + (uvb_i * uvbresp)) / 2.0
     };
 
     index
