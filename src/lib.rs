@@ -206,3 +206,51 @@ where
         Ok(u16::from(data[1]) << 8 | u16::from(data[0]))
     }
 }
+
+/*
+  UV Index function based on code from the Arduino_MKRENV library.
+
+  Copyright (c) 2019 Arduino SA. All rights reserved.
+
+  This library is free software; you can redistribute it and/or
+  modify it under the terms of the GNU Lesser General Public
+  License as published by the Free Software Foundation; either
+  version 2.1 of the License, or (at your option) any later version.
+
+  This library is distributed in the hope that it will be useful,
+  but WITHOUT ANY WARRANTY; without even the implied warranty of
+  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+  Lesser General Public License for more details.
+
+  You should have received a copy of the GNU Lesser General Public
+  License along with this library; if not, write to the Free Software
+  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+*/
+
+/// Convert the raw sensor readings into a UV Index.
+///
+/// Coefficients chosen from Designing the VEML6075 Into an Application
+/// table UV COEFFICIENTS AND RESPONSIVITY for Open Air.
+pub fn calculate_uv_index(uva: u16, uvb: u16, uvcomp1: u16, uvcomp2: u16) -> f32 {
+    let uva: f32 = {
+        let a: f32 = 2.22;
+        let b: f32 = 1.33;
+
+        (uva as f32) - (a * (uvcomp1 as f32)) - (b * (uvcomp2 as f32))
+    };
+    let uvb: f32 = {
+        let c: f32 = 2.95;
+        let d: f32 = 1.74;
+
+        (uvb as f32) - (c * (uvcomp1 as f32)) - (d * (uvcomp2 as f32))
+    };
+
+    let index: f32 = {
+        let uvaresp: f32 = 0.001461;
+        let uvbresp: f32 = 0.002591;
+
+        ((uva * uvaresp) + (uvb * uvbresp)) / 2.0
+    };
+
+    index
+}
