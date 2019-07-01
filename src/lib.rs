@@ -107,7 +107,9 @@ impl Register {
 struct BitFlags;
 
 impl BitFlags {
-    const SHUTDOWN: u8 = 0b0000_0001;
+    const TRIGGER: u8      = 0b0000_0100;
+    const ACTIVE_FORCE: u8 = 0b0000_0010;
+    const SHUTDOWN: u8     = 0b0000_0001;
 }
 
 const DEVICE_ADDRESS: u8 = 0x10;
@@ -164,6 +166,24 @@ where
         self.write_config(config | BitFlags::SHUTDOWN)
     }
 
+    /// Enable active force mode where measurements are taken on demand
+    pub fn enable_active_force(&mut self) -> Result<(), Error<E>> {
+        let config = self.config;
+        self.write_config(config | BitFlags::ACTIVE_FORCE)
+    }
+
+    /// Disable active force mode, measurements are taken continuously
+    pub fn disable_active_force(&mut self) -> Result<(), Error<E>> {
+        let config = self.config;
+        self.write_config(config & !BitFlags::ACTIVE_FORCE)
+    }
+
+    /// Trigger a reading in active force mode
+    pub fn trigger(&mut self) -> Result<(), Error<E>> {
+        let config = self.config;
+        self.write_config(config | BitFlags::TRIGGER)
+    }
+
     /// Set the integration time for measurements.
     pub fn set_integration_time(&mut self, it: IntegrationTime) -> Result<(), Error<E>> {
         let config = self.config;
@@ -183,6 +203,12 @@ impl<I2C, E> Veml6075<I2C>
 where
     I2C: hal::blocking::i2c::WriteRead<Error = E>,
 {
+    /// Check whether a measurement is underway in active force mode
+    pub fn is_trigger(&mut self) -> Result<bool, Error<E>> {
+        let config = (self.read_register(Register::CONFIG)? & 0b1111_1111) as u8;
+        Ok((config & BitFlags::TRIGGER) != 0)
+    }
+
     /// Read the sensor data of all channels at once.
     pub fn read_all(&mut self) -> Result<Measurement, Error<E>> {
         Ok(Measurement {
