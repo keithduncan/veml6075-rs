@@ -18,6 +18,7 @@ impl BitFlags {
     const HD: u8 = 0b0000_1000;
     const UV_TRIG: u8 = 0b0000_0100;
     const UV_AF: u8 = 0b0000_0010;
+    const TRIGGER: u8 = 0b0000_0100;
 }
 
 const DEVICE_ADDRESS: u8 = 0x10;
@@ -110,6 +111,12 @@ impl<I2C, E> Veml6075<I2C>
 where
     I2C: hal::blocking::i2c::WriteRead<Error = E>,
 {
+    /// Check whether a measurement is underway in active force mode
+    pub fn is_measuring(&mut self) -> Result<bool, Error<E>> {
+        let config = (self.read_register(Register::CONFIG)? & 0b1111_1111) as u8;
+        Ok((config & BitFlags::TRIGGER) != 0)
+    }
+
     /// Read the sensor data and calculate calibrated reading values.
     pub fn read(&mut self) -> Result<Measurement, Error<E>> {
         let uva = self.read_uva_raw()?;
