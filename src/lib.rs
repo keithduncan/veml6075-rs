@@ -4,13 +4,25 @@
 //! [`embedded-hal`]: https://github.com/rust-embedded/embedded-hal
 //!
 //! This driver allows you to:
-//! - Enable/disable the sensor. See `enable()`.
-//! - Read the UVA measurement. See `read_uva()`.
-//! - Read the UVB measurement. See `read_uvb()`.
-//! - Read the UVcomp1 measurement. See `read_uvcomp1()`.
-//! - Read the UVcomp2 measurement. See `read_uvcomp2()`.
-//! - Read all sensor data at once. See `read_all()`.
-//! - Read the device id. See `read_device_id()`.
+//! - Enable/disable the sensor. See: [`enable()`].
+//! - Read calibrated UVA, UVB and UV index measurement. See: [`read()`].
+//! - Read raw measurement. See: [`read_uva_raw()`].
+//! - Set integration time. See: [`set_integration_time()`].
+//! - Set dynamic setting. See: [`set_dynamic_setting()`].
+//! - Change operating mode. See: [`set_mode()`].
+//! - Trigger measurement when on active force mode. See: [`trigger_measurement()`].
+//! - Read the device id. See: [`read_device_id()`].
+//!
+//! [Introductory blog post](https://blog.eldruin.com/veml6075-uva-uvb-uv-index-light-sensor-driver-in-rust/)
+//!
+//! [`enable()`]: struct.Veml6075.html#method.enable
+//! [`read()`]: struct.Veml6075.html#method.read
+//! [`read_uva_raw()`]: struct.Veml6075.html#method.read_uva_raw
+//! [`set_integration_time()`]: struct.Veml6075.html#method.set_integration_time
+//! [`set_dynamic_setting()`]: struct.Veml6075.html#method.set_dynamic_setting
+//! [`set_mode()`]: struct.Veml6075.html#method.set_mode
+//! [`trigger_measurement()`]: struct.Veml6075.html#method.trigger_measurement
+//! [`read_device_id()`]: struct.Veml6075.html#method.read_device_id
 //!
 //! ## The device
 //! The VEML6075 senses UVA and UVB light and incorporates photodiode,
@@ -25,14 +37,18 @@
 //! VEML6075's operating voltage ranges from 1.7 V to 3.6 V.
 //!
 //! Datasheet:
-//! - [VEML6075](https://www.vishay.com/docs/84304/veml6075.pdf)
+//! - [VEML6075](https://cdn.sparkfun.com/assets/3/c/3/2/f/veml6075.pdf)
 //!
 //! Application note:
-//! - [VEML6075 AN](https://www.vishay.com/docs/84339/designingveml6075.pdf)
+//! - [Designing the VEML6075 into an Application](https://cdn.sparkfun.com/assets/3/9/d/4/1/designingveml6075.pdf)
 //!
 //! ## Usage examples (see also examples folder)
 //!
-//! ### Read UVA and UVB
+//! Please find additional examples using hardware in this repository: [driver-examples]
+//!
+//! [driver-examples]: https://github.com/eldruin/driver-examples
+//!
+//! ### Read calibrated UVA, UVB and UV index
 //!
 //! Import this crate and an `embedded_hal` implementation, then instantiate
 //! the device:
@@ -40,29 +56,77 @@
 //! ```no_run
 //! extern crate linux_embedded_hal as hal;
 //! extern crate veml6075;
-//! use veml6075::Veml6075;
+//! use veml6075::{Calibration, Veml6075};
 //!
 //! # fn main() {
 //! let dev = hal::I2cdev::new("/dev/i2c-1").unwrap();
-//! let mut sensor = Veml6075::new(dev);
-//! let uva = sensor.read_uva().unwrap();
-//! let uvb = sensor.read_uvb().unwrap();
-//! println!("Measurements UVA: {}, UVB: {}", uva, uvb);
+//! let mut sensor = Veml6075::new(dev, Calibration::default());
+//! let m = sensor.read().unwrap();
+//! println!("UVA: {:2}, UVB: {:2}, UVI: {:2}", m.uva, m.uvb, m.uv_index);
 //! # }
 //! ```
 //!
-//! ### Read all channels at once
+//! ### Set integration time to 400ms
 //!
 //! ```no_run
 //! extern crate linux_embedded_hal as hal;
 //! extern crate veml6075;
-//! use veml6075::Veml6075;
+//! use veml6075::{Calibration, IntegrationTime, Veml6075};
 //!
 //! # fn main() {
 //! let dev = hal::I2cdev::new("/dev/i2c-1").unwrap();
-//! let mut sensor = Veml6075::new(dev);
-//! let measurement = sensor.read_all().unwrap();
-//! println!("Measurements UVA: {}, UVB: {}", measurement.uva, measurement.uvb);
+//! let mut sensor = Veml6075::new(dev, Calibration::default());
+//! sensor.set_integration_time(IntegrationTime::Ms400).unwrap();
+//! # }
+//! ```
+//!
+//! ### Set high dynamic setting
+//!
+//! ```no_run
+//! extern crate linux_embedded_hal as hal;
+//! extern crate veml6075;
+//! use veml6075::{Calibration, DynamicSetting, Veml6075};
+//!
+//! # fn main() {
+//! let dev = hal::I2cdev::new("/dev/i2c-1").unwrap();
+//! let mut sensor = Veml6075::new(dev, Calibration::default());
+//! sensor.set_dynamic_setting(DynamicSetting::High).unwrap();
+//! # }
+//! ```
+//!
+//! ### Change mode to active force (one-shot) and trigger a measurement
+//!
+//! ```no_run
+//! extern crate linux_embedded_hal as hal;
+//! extern crate veml6075;
+//! use veml6075::{Calibration, Mode, Veml6075};
+//!
+//! # fn main() {
+//! let dev = hal::I2cdev::new("/dev/i2c-1").unwrap();
+//! let mut sensor = Veml6075::new(dev, Calibration::default());
+//! sensor.set_mode(Mode::ActiveForce).unwrap();
+//! loop {
+//!     sensor.trigger_measurement().unwrap();
+//!     // wait until measurement is ready (integration time)
+//!     let m = sensor.read().unwrap();
+//!     println!("Measurements UVA: {:2}, UVB: {:2}", m.uva, m.uvb);
+//! }
+//! # }
+//! ```
+//!
+//! ### Read raw measurements for UVA and UVB
+//!
+//! ```no_run
+//! extern crate linux_embedded_hal as hal;
+//! extern crate veml6075;
+//! use veml6075::{Calibration, Veml6075};
+//!
+//! # fn main() {
+//! let dev = hal::I2cdev::new("/dev/i2c-1").unwrap();
+//! let mut sensor = Veml6075::new(dev, Calibration::default());
+//! let uva = sensor.read_uva_raw().unwrap();
+//! let uvb = sensor.read_uvb_raw().unwrap();
+//! println!("Measurements UVA: {}, UVB: {}", uva, uvb);
 //! # }
 //! ```
 
@@ -71,7 +135,6 @@
 #![no_std]
 
 extern crate embedded_hal as hal;
-use hal::blocking::i2c::Write;
 
 /// All possible errors in this crate
 #[derive(Debug)]
@@ -80,52 +143,65 @@ pub enum Error<E> {
     I2C(E),
 }
 
-/// Result of measurement of all channels
+/// Calibrated Measurement
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Measurement {
-    /// UVA sensor data
-    pub uva: u16,
-    /// UVB sensor data
-    pub uvb: u16,
-    /// UVcomp1 sensor data
-    pub uvcomp1: u16,
-    /// UVcomp2 sensor data
-    pub uvcomp2: u16,
+    /// UVA calibrated reading
+    pub uva: f32,
+    /// UVB calibrated reading
+    pub uvb: f32,
+    /// UV index
+    pub uv_index: f32,
 }
 
-struct Register;
-
-impl Register {
-    const CONFIG: u8 = 0x00;
-    const UVA: u8 = 0x07;
-    const UVB: u8 = 0x09;
-    const UVCOMP1: u8 = 0x0A;
-    const UVCOMP2: u8 = 0x0B;
-    const DEVICE_ID: u8 = 0x0C;
-}
-
-struct BitFlags;
-
-impl BitFlags {
-    const TRIGGER: u8      = 0b0000_0100;
-    const ACTIVE_FORCE: u8 = 0b0000_0010;
-    const SHUTDOWN: u8     = 0b0000_0001;
-}
-
-const DEVICE_ADDRESS: u8 = 0x10;
-
-/// Integration durations for the UV measurement.
+/// Integration time
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum IntegrationTime {
-    /// 50ms
-    It50  = 0b000,
-    /// 100ms
-    It100 = 0b001,
-    /// 200ms
-    It200 = 0b010,
-    /// 400ms
-    It400 = 0b011,
-    /// 800ms
-    It800 = 0b100,
+    /// 50 ms
+    Ms50,
+    /// 100 ms
+    Ms100,
+    /// 200 ms
+    Ms200,
+    /// 400 ms
+    Ms400,
+    /// 800 ms
+    Ms800,
+}
+
+/// Dynamic setting
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum DynamicSetting {
+    /// Normal dynamic setting
+    Normal,
+    /// High dynamic setting
+    High,
+}
+
+/// Operating mode
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum Mode {
+    /// Continuous measurement (default)
+    Continuous,
+    /// Active force (one-shot)
+    ActiveForce,
+}
+
+/// Calibration coefficients
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct Calibration {
+    /// UVA visible (a) coefficient
+    pub uva_visible: f32,
+    /// UVA IR (b) coefficient
+    pub uva_ir: f32,
+    /// UVB visible (c) coefficient
+    pub uvb_visible: f32,
+    /// UVB IR (d) coefficient
+    pub uvb_ir: f32,
+    /// UVA responsivity
+    pub uva_responsivity: f32,
+    /// UVB responsivity
+    pub uvb_responsivity: f32,
 }
 
 /// Veml6075 device driver.
@@ -135,168 +211,20 @@ pub struct Veml6075<I2C> {
     i2c: I2C,
     /// Configuration register status.
     config: u8,
+    calibration: Calibration,
 }
 
-impl<I2C, E> Veml6075<I2C>
-where
-    I2C: Write<Error = E>,
-{
-    /// Create new instance of the Veml6075 device.
-    pub fn new(i2c: I2C) -> Self {
-        Veml6075 {
-            i2c,
-            config: 0x01, // shutdown
+mod device_impl;
+
+impl Default for Calibration {
+    fn default() -> Self {
+        Calibration {
+            uva_visible: 2.22,
+            uva_ir: 1.33,
+            uvb_visible: 2.95,
+            uvb_ir: 1.74,
+            uva_responsivity: 0.001_461,
+            uvb_responsivity: 0.002_591,
         }
     }
-
-    /// Destroy driver instance, return I²C bus instance.
-    pub fn destroy(self) -> I2C {
-        self.i2c
-    }
-
-    /// Enable the sensor.
-    pub fn enable(&mut self) -> Result<(), Error<E>> {
-        let config = self.config;
-        self.write_config(config & !BitFlags::SHUTDOWN)
-    }
-
-    /// Disable the sensor (shutdown).
-    pub fn disable(&mut self) -> Result<(), Error<E>> {
-        let config = self.config;
-        self.write_config(config | BitFlags::SHUTDOWN)
-    }
-
-    /// Enable active force mode where measurements are taken on demand
-    pub fn enable_active_force(&mut self) -> Result<(), Error<E>> {
-        let config = self.config;
-        self.write_config(config | BitFlags::ACTIVE_FORCE)
-    }
-
-    /// Disable active force mode, measurements are taken continuously
-    pub fn disable_active_force(&mut self) -> Result<(), Error<E>> {
-        let config = self.config;
-        self.write_config(config & !BitFlags::ACTIVE_FORCE)
-    }
-
-    /// Trigger a reading in active force mode
-    pub fn trigger(&mut self) -> Result<(), Error<E>> {
-        let config = self.config;
-        self.write_config(config | BitFlags::TRIGGER)
-    }
-
-    /// Set the integration time for measurements.
-    pub fn set_integration_time(&mut self, it: IntegrationTime) -> Result<(), Error<E>> {
-        let config = self.config;
-        self.write_config(config | ((it as u8) << 4))
-    }
-
-    fn write_config(&mut self, config: u8) -> Result<(), Error<E>> {
-        self.i2c
-            .write(DEVICE_ADDRESS, &[Register::CONFIG, config, 0])
-            .map_err(Error::I2C)?;
-        self.config = config;
-        Ok(())
-    }
-}
-
-impl<I2C, E> Veml6075<I2C>
-where
-    I2C: hal::blocking::i2c::WriteRead<Error = E>,
-{
-    /// Check whether a measurement is underway in active force mode
-    pub fn is_trigger(&mut self) -> Result<bool, Error<E>> {
-        let config = (self.read_register(Register::CONFIG)? & 0b1111_1111) as u8;
-        Ok((config & BitFlags::TRIGGER) != 0)
-    }
-
-    /// Read the sensor data of all channels at once.
-    pub fn read_all(&mut self) -> Result<Measurement, Error<E>> {
-        Ok(Measurement {
-            uva: self.read_uva()?,
-            uvb: self.read_uvb()?,
-            uvcomp1: self.read_uvcomp1()?,
-            uvcomp2: self.read_uvcomp2()?,
-        })
-    }
-
-    /// Read the UVA sensor data.
-    pub fn read_uva(&mut self) -> Result<u16, Error<E>> {
-        self.read_register(Register::UVA)
-    }
-
-    /// Read the UVB sensor data.
-    pub fn read_uvb(&mut self) -> Result<u16, Error<E>> {
-        self.read_register(Register::UVB)
-    }
-
-    /// Read the UVcomp1 sensor data.
-    pub fn read_uvcomp1(&mut self) -> Result<u16, Error<E>> {
-        self.read_register(Register::UVCOMP1)
-    }
-
-    /// Read the UVcomp2 sensor data.
-    pub fn read_uvcomp2(&mut self) -> Result<u16, Error<E>> {
-        self.read_register(Register::UVCOMP2)
-    }
-
-    /// Read the device ID
-    pub fn read_device_id(&mut self) -> Result<u16, Error<E>> {
-        self.read_register(Register::DEVICE_ID)
-    }
-
-    fn read_register(&mut self, register: u8) -> Result<u16, Error<E>> {
-        let mut data = [0; 2];
-        self.i2c
-            .write_read(DEVICE_ADDRESS, &[register], &mut data)
-            .map_err(Error::I2C)?;
-        Ok(u16::from(data[1]) << 8 | u16::from(data[0]))
-    }
-}
-
-/*
-  UV Index function based on code from the Arduino_MKRENV library.
-
-  Copyright (c) 2019 Arduino SA. All rights reserved.
-
-  This library is free software; you can redistribute it and/or
-  modify it under the terms of the GNU Lesser General Public
-  License as published by the Free Software Foundation; either
-  version 2.1 of the License, or (at your option) any later version.
-
-  This library is distributed in the hope that it will be useful,
-  but WITHOUT ANY WARRANTY; without even the implied warranty of
-  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-  Lesser General Public License for more details.
-
-  You should have received a copy of the GNU Lesser General Public
-  License along with this library; if not, write to the Free Software
-  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
-*/
-
-/// Convert the raw sensor readings into a UV Index.
-///
-/// Coefficients chosen from Designing the VEML6075 Into an Application
-/// table UV COEFFICIENTS AND RESPONSIVITY for Open Air.
-pub fn calculate_uv_index(uva: u16, uvb: u16, uvcomp1: u16, uvcomp2: u16) -> f32 {
-    let uva_i: f32 = {
-        let a: f32 = 2.22;
-        let b: f32 = 1.33;
-
-        (uva as f32) - (a * (uvcomp1 as f32)) - (b * (uvcomp2 as f32))
-    };
-    let uvb_i: f32 = {
-        let c: f32 = 2.95;
-        let d: f32 = 1.74;
-
-        (uvb as f32) - (c * (uvcomp1 as f32)) - (d * (uvcomp2 as f32))
-    };
-
-    let index: f32 = {
-        let uvaresp: f32 = 0.001461;
-        let uvbresp: f32 = 0.002591;
-
-        ((uva_i * uvaresp) + (uvb_i * uvbresp)) / 2.0
-    };
-
-    index
 }
